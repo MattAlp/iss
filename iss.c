@@ -193,7 +193,6 @@ static CGEventRef cb(CGEventTapProxy proxy, CGEventType type, CGEventRef ev, voi
             return NULL;
         }
         if (phase == kGestureChanged && swipeTracking) {
-            if (vertical) swipeVertical = true;
             if (!swipeFired) {
                 double p = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeProgress);
                 // Some hardware/OS combinations report vertical movement in
@@ -208,7 +207,6 @@ static CGEventRef cb(CGEventTapProxy proxy, CGEventType type, CGEventRef ev, voi
             return NULL;
         }
         if (phase == kGestureEnded && swipeTracking) {
-            if (vertical) swipeVertical = true;
             if (!swipeFired) {
                 if (swipeVertical) {
                     double v = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeVelocityY);
