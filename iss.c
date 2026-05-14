@@ -200,6 +200,7 @@ static CGEventRef cb(CGEventTapProxy proxy, CGEventType type, CGEventRef ev, voi
                 if (p == 0.0) p = CGEventGetDoubleValueField(ev, kCGEventGestureScrollY);
                 if (p != 0.0) {
                     swipeFired = true;
+                    // Up and down both map to Mission Control toggle behavior.
                     if (swipeVertical) post_mission_control();
                     else post_switch(p > 0);
                 }
@@ -209,14 +210,14 @@ static CGEventRef cb(CGEventTapProxy proxy, CGEventType type, CGEventRef ev, voi
         if (phase == kGestureEnded && swipeTracking) {
             if (!swipeFired) {
                 if (swipeVertical) {
-                    double v = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeVelocityY);
+                    double velocityY = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeVelocityY);
                     // Same fallback rationale as above: vertical swipes may be
                     // surfaced via scrollY instead of swipeVelocityY.
-                    if (v == 0.0) v = CGEventGetDoubleValueField(ev, kCGEventGestureScrollY);
-                    if (v != 0.0) post_mission_control();
+                    if (velocityY == 0.0) velocityY = CGEventGetDoubleValueField(ev, kCGEventGestureScrollY);
+                    if (velocityY != 0.0) post_mission_control();
                 } else {
-                    double v = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeVelocityX);
-                    if (v != 0.0) post_switch(v > 0);
+                    double velocityX = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeVelocityX);
+                    if (velocityX != 0.0) post_switch(velocityX > 0);
                 }
             }
             swipeTracking = swipeFired = swipeVertical = false;

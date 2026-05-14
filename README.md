@@ -8,7 +8,7 @@ A CGEventTap intercepts trackpad dock-swipe gestures before the Dock sees them, 
 
 **No SIP disable required.** CGEventTap and CGEventPost are public, supported APIs — the same mechanism macOS uses for Accessibility features. No code injection, no DYLD tricks, no system file modification. The only undocumented parts are the CGEvent field indices (55, 110, 132, etc.) used to read/write gesture metadata, which are just integer constants passed to public functions. SIP has nothing to protect here.
 
-Vertical 3-finger swipes up/down trigger Mission Control.
+Vertical 3-finger swipes up/down trigger (toggle) Mission Control.
 
 ## Compatibility
 
