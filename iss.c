@@ -193,21 +193,27 @@ static CGEventRef cb(CGEventTapProxy proxy, CGEventType type, CGEventRef ev, voi
             return NULL;
         }
         if (phase == kGestureChanged && swipeTracking) {
+            if (vertical) swipeVertical = true;
             if (!swipeFired) {
                 double p = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeProgress);
+                // Some hardware/OS combinations report vertical movement in
+                // scrollY while swipeProgress stays 0.
                 if (p == 0.0) p = CGEventGetDoubleValueField(ev, kCGEventGestureScrollY);
                 if (p != 0.0) {
                     swipeFired = true;
-                    if (vertical || swipeVertical) post_mission_control();
+                    if (swipeVertical) post_mission_control();
                     else post_switch(p > 0);
                 }
             }
             return NULL;
         }
         if (phase == kGestureEnded && swipeTracking) {
+            if (vertical) swipeVertical = true;
             if (!swipeFired) {
-                if (vertical || swipeVertical) {
+                if (swipeVertical) {
                     double v = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeVelocityY);
+                    // Same fallback rationale as above: vertical swipes may be
+                    // surfaced via scrollY instead of swipeVelocityY.
                     if (v == 0.0) v = CGEventGetDoubleValueField(ev, kCGEventGestureScrollY);
                     if (v != 0.0) post_mission_control();
                 } else {
