@@ -194,15 +194,19 @@ static CGEventRef cb(CGEventTapProxy proxy, CGEventType type, CGEventRef ev, voi
         }
         if (phase == kGestureChanged && swipeTracking) {
             if (!swipeFired) {
-                double p = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeProgress);
-                // Some hardware/OS combinations report vertical movement in
-                // scrollY while swipeProgress stays 0.
-                if (swipeVertical && p == 0.0) p = CGEventGetDoubleValueField(ev, kCGEventGestureScrollY);
-                if (p != 0.0) {
-                    swipeFired = true;
-                    // Up and down both map to Mission Control toggle behavior.
-                    if (swipeVertical) post_mission_control();
-                    else post_switch(p > 0);
+                if (swipeVertical) {
+                    double progressY = CGEventGetDoubleValueField(ev, kCGEventGestureScrollY);
+                    if (progressY != 0.0) {
+                        // Up and down both map to Mission Control toggle behavior.
+                        swipeFired = true;
+                        post_mission_control();
+                    }
+                } else {
+                    double progressX = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeProgress);
+                    if (progressX != 0.0) {
+                        swipeFired = true;
+                        post_switch(progressX > 0);
+                    }
                 }
             }
             return NULL;
@@ -211,9 +215,9 @@ static CGEventRef cb(CGEventTapProxy proxy, CGEventType type, CGEventRef ev, voi
             if (!swipeFired) {
                 if (swipeVertical) {
                     double velocityY = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeVelocityY);
-                    // If velocity is missing, use cumulative progress just to
-                    // infer non-zero direction and avoid dropping the gesture.
-                    if (velocityY == 0.0) velocityY = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeProgress);
+                    // If velocity is missing, fall back to vertical delta only
+                    // to detect that the gesture actually moved.
+                    if (velocityY == 0.0) velocityY = CGEventGetDoubleValueField(ev, kCGEventGestureScrollY);
                     if (velocityY != 0.0) post_mission_control();
                 } else {
                     double velocityX = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeVelocityX);
