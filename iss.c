@@ -215,11 +215,13 @@ static CGEventRef cb(CGEventTapProxy proxy, CGEventType type, CGEventRef ev, voi
             if (!swipeFired) {
                 if (swipeVertical) {
                     double velocityY = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeVelocityY);
-                    // If velocity is missing, fall back to vertical delta only
-                    // to detect that the gesture actually moved.
+                    // Vertical discrete gestures sometimes arrive without a
+                    // non-zero swipeVelocityY, so we also check scrollY delta
+                    // to avoid dropping valid Mission Control swipes.
                     double deltaY = CGEventGetDoubleValueField(ev, kCGEventGestureScrollY);
                     if (velocityY != 0.0 || deltaY != 0.0) post_mission_control();
                 } else {
+                    // Horizontal dock swipes reliably provide velocityX in Ended.
                     double velocityX = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeVelocityX);
                     if (velocityX != 0.0) post_switch(velocityX > 0);
                 }
