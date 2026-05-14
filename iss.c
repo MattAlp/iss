@@ -197,7 +197,7 @@ static CGEventRef cb(CGEventTapProxy proxy, CGEventType type, CGEventRef ev, voi
                 double p = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeProgress);
                 // Some hardware/OS combinations report vertical movement in
                 // scrollY while swipeProgress stays 0.
-                if (p == 0.0) p = CGEventGetDoubleValueField(ev, kCGEventGestureScrollY);
+                if (swipeVertical && p == 0.0) p = CGEventGetDoubleValueField(ev, kCGEventGestureScrollY);
                 if (p != 0.0) {
                     swipeFired = true;
                     // Up and down both map to Mission Control toggle behavior.
@@ -211,9 +211,9 @@ static CGEventRef cb(CGEventTapProxy proxy, CGEventType type, CGEventRef ev, voi
             if (!swipeFired) {
                 if (swipeVertical) {
                     double velocityY = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeVelocityY);
-                    // Same fallback rationale as above: vertical swipes may be
-                    // surfaced via scrollY instead of swipeVelocityY.
-                    if (velocityY == 0.0) velocityY = CGEventGetDoubleValueField(ev, kCGEventGestureScrollY);
+                    // If velocity is missing, use cumulative progress just to
+                    // infer non-zero direction and avoid dropping the gesture.
+                    if (velocityY == 0.0) velocityY = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeProgress);
                     if (velocityY != 0.0) post_mission_control();
                 } else {
                     double velocityX = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeVelocityX);
