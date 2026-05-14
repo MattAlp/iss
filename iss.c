@@ -14,7 +14,7 @@
 //   5. Companion kCGSEventGesture events are also suppressed during an
 //      active swipe to keep the event stream consistent.
 //
-// Vertical swipes (Mission Control, App Exposé) are left untouched.
+// Vertical swipes trigger Mission Control.
 // Does not require disabling SIP.
 
 #include <ApplicationServices/ApplicationServices.h>
@@ -43,7 +43,9 @@ static const CGEventField kCGEventGestureZoomDeltaX     = 139; // required, reas
 enum { kCGSEventGesture = 29, kCGSEventDockControl = 30 };
 enum { kIOHIDEventTypeDockSwipe = 23 };
 enum { kCGGestureMotionHorizontal = 1 };
+enum { kCGGestureMotionVertical = 2 };
 enum { kGestureBegan = 1, kGestureChanged = 2, kGestureEnded = 4, kGestureCancelled = 8 };
+enum { kVKMissionControl = 160 };
 
 extern int CGSMainConnectionID(void);
 extern uint64_t CGSGetActiveSpace(int cid);
@@ -52,7 +54,7 @@ extern CFArrayRef CGSCopyManagedDisplaySpaces(int cid);
 // --- State -------------------------------------------------------------------
 
 static CFMachPortRef tap;
-static bool swipeTracking, swipeFired;
+static bool swipeTracking, swipeFired, swipeVertical;
 static int  passthrough; // synthetic events remaining to let through
 
 // --- Synthetic gesture posting ------------------------------------------------
@@ -142,6 +144,17 @@ static void post_switch(bool right) {
     post_pair(end);
 }
 
+static void post_mission_control(void) {
+    CGEventRef down = CGEventCreateKeyboardEvent(NULL, kVKMissionControl, true);
+    if (!down) return;
+    CGEventRef up = CGEventCreateKeyboardEvent(NULL, kVKMissionControl, false);
+    if (!up) { CFRelease(down); return; }
+    CGEventPost(kCGHIDEventTap, down);
+    CGEventPost(kCGHIDEventTap, up);
+    CFRelease(down);
+    CFRelease(up);
+}
+
 // --- Event tap callback ------------------------------------------------------
 // Intercepts real horizontal dock swipes. Direction is determined from swipe
 // progress (Changed phase) or velocity (Ended phase, fallback for discrete
@@ -165,32 +178,49 @@ static CGEventRef cb(CGEventTapProxy proxy, CGEventType type, CGEventRef ev, voi
         return ev;
     }
 
-    // Only intercept horizontal dock swipes (not Mission Control, App Exposé, etc.)
+    // Intercept dock swipes and replace with synthetic instant actions.
     if (et == kCGSEventDockControl
-        && (int)CGEventGetIntegerValueField(ev, kCGEventGestureHIDType) == kIOHIDEventTypeDockSwipe
-        && (int)CGEventGetIntegerValueField(ev, kCGEventGestureSwipeMotion) == kCGGestureMotionHorizontal) {
+        && (int)CGEventGetIntegerValueField(ev, kCGEventGestureHIDType) == kIOHIDEventTypeDockSwipe) {
 
         int phase = (int)CGEventGetIntegerValueField(ev, kCGEventGesturePhase);
+        int motion = (int)CGEventGetIntegerValueField(ev, kCGEventGestureSwipeMotion);
+        bool vertical = (motion == kCGGestureMotionVertical);
 
         if (phase == kGestureBegan) {
-            swipeTracking = true; swipeFired = false; return NULL;
+            swipeTracking = true;
+            swipeFired = false;
+            swipeVertical = vertical;
+            return NULL;
         }
         if (phase == kGestureChanged && swipeTracking) {
             if (!swipeFired) {
                 double p = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeProgress);
-                if (p != 0.0) { swipeFired = true; post_switch(p > 0); }
+                if (p == 0.0) p = CGEventGetDoubleValueField(ev, kCGEventGestureScrollY);
+                if (p != 0.0) {
+                    swipeFired = true;
+                    if (vertical || swipeVertical) post_mission_control();
+                    else post_switch(p > 0);
+                }
             }
             return NULL;
         }
         if (phase == kGestureEnded && swipeTracking) {
             if (!swipeFired) {
-                double v = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeVelocityX);
-                if (v != 0.0) post_switch(v > 0);
+                if (vertical || swipeVertical) {
+                    double v = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeVelocityY);
+                    if (v == 0.0) v = CGEventGetDoubleValueField(ev, kCGEventGestureScrollY);
+                    if (v != 0.0) post_mission_control();
+                } else {
+                    double v = CGEventGetDoubleValueField(ev, kCGEventGestureSwipeVelocityX);
+                    if (v != 0.0) post_switch(v > 0);
+                }
             }
-            swipeTracking = swipeFired = false; return NULL;
+            swipeTracking = swipeFired = swipeVertical = false;
+            return NULL;
         }
         if (phase == kGestureCancelled) {
-            swipeTracking = swipeFired = false; return NULL;
+            swipeTracking = swipeFired = swipeVertical = false;
+            return NULL;
         }
         return swipeTracking ? NULL : ev;
     }
